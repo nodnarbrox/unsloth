@@ -258,9 +258,9 @@ def swiglu_DWf_DW_dfg_kernel(DW, e, g):
     dg = DW_orig * g_orig
     de = (dg.float() * se * (1.0 + e_f * (1.0 - se))).to(DW.dtype)
 
-    DW.copy_(h)
-    e.copy_(df)
-    g.copy_(de)
+    DW.data.copy_(h)
+    e.data.copy_(df)
+    g.data.copy_(de)
     return DW, e, g
 
 
@@ -301,9 +301,9 @@ def geglu_exact_backward_kernel(DW, e, g):
     df_de = f_partial + t * e_f * torch.exp(-0.5 * e_f * e_f)
     de = (dg.float() * df_de).to(DW.dtype)
 
-    DW.copy_(h)
-    e.copy_(df)
-    g.copy_(de)
+    DW.data.copy_(h)
+    e.data.copy_(df)
+    g.data.copy_(de)
     return DW, e, g
 
 
@@ -342,9 +342,9 @@ def geglu_approx_backward_kernel(DW, e, g):
     dg = DW_orig * g_orig
     de = (dg.float() * df_de).to(DW.dtype)
 
-    DW.copy_(h)
-    e.copy_(df)
-    g.copy_(de)
+    DW.data.copy_(h)
+    e.data.copy_(df)
+    g.data.copy_(de)
     return DW, e, g
 
 
