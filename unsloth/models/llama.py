@@ -3588,4 +3588,5 @@ class FastLlamaModel:
 
 from .rl import PatchFastRL
 
-PatchFastRL(FastLanguageModel = FastLlamaModel)
+if not IS_MAXWELL_GPU:
+    PatchFastRL(FastLanguageModel = FastLlamaModel)
