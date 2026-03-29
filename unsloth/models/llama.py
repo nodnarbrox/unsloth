@@ -2802,9 +2802,13 @@ class FastLlamaModel:
         # Apply gradient checkpointing with smart heuristics
         max_seq = getattr(model, "max_seq_length", 512)
         dtype = model.get_input_embeddings().weight.dtype
-        use_gradient_checkpointing = apply_unsloth_gradient_checkpointing(
-            use_gradient_checkpointing, max_seq, dtype
-        )
+        if IS_MAXWELL_GPU:
+            # M40: Force standard gradient checkpointing (unsloth's has in-place ops)
+            use_gradient_checkpointing = True if use_gradient_checkpointing else False
+        else:
+            use_gradient_checkpointing = apply_unsloth_gradient_checkpointing(
+                use_gradient_checkpointing, max_seq, dtype
+            )
 
         if type(r) is not int:
             raise TypeError(f"Unsloth: Rank of {str(r)} must be an integer.")
