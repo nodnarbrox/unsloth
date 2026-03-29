@@ -1329,6 +1329,10 @@ class FastBaseModel:
         tokenizer = None,
         float32_mixed_precision = None,
     ):
+        if IS_MAXWELL_GPU:
+            # M40: Skip in-place forward patching (breaks autograd on sm_52).
+            # Use vanilla HF model forward functions instead.
+            return model
         full_finetuning = os.environ.get("UNSLOTH_ENABLE_FULL_FINETUNING", "0") == "1"
 
         if type(float32_mixed_precision) is bool:

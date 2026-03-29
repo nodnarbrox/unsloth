@@ -2721,6 +2721,10 @@ class FastLlamaModel:
 
     @staticmethod
     def post_patch(model, tokenizer, correct_dtype = None):
+        if IS_MAXWELL_GPU:
+            # M40: Skip in-place forward patching (breaks autograd on sm_52).
+            # Use vanilla HF model forward functions instead.
+            return model, tokenizer
         model, tokenizer = patch_model_and_tokenizer(
             model, tokenizer, downcast_rope = True, correct_dtype = correct_dtype
         )
