@@ -2799,16 +2799,28 @@ class FastLlamaModel:
             return model
         transformers_set_seed(random_state)
 
+        # M40: Pure PEFT path - no Unsloth patching
+        if IS_MAXWELL_GPU:
+            from peft import get_peft_model as _peft_get, LoraConfig as _LoraConf
+            _config = _LoraConf(
+                r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
+                target_modules=target_modules, bias=bias, task_type="CAUSAL_LM",
+                layers_to_transform=layers_to_transform, layers_pattern=layers_pattern,
+                use_rslora=use_rslora, modules_to_save=modules_to_save,
+                init_lora_weights=init_lora_weights, loftq_config=loftq_config,
+            )
+            model = _peft_get(model, _config)
+            if use_gradient_checkpointing:
+                model.gradient_checkpointing_enable()
+            print(f"Unsloth [M40]: Applied LoRA via pure PEFT (r={r}, alpha={lora_alpha})")
+            return model
+
         # Apply gradient checkpointing with smart heuristics
         max_seq = getattr(model, "max_seq_length", 512)
         dtype = model.get_input_embeddings().weight.dtype
-        if IS_MAXWELL_GPU:
-            # M40: Force standard gradient checkpointing (unsloth's has in-place ops)
-            use_gradient_checkpointing = True if use_gradient_checkpointing else False
-        else:
-            use_gradient_checkpointing = apply_unsloth_gradient_checkpointing(
-                use_gradient_checkpointing, max_seq, dtype
-            )
+        use_gradient_checkpointing = apply_unsloth_gradient_checkpointing(
+            use_gradient_checkpointing, max_seq, dtype
+        )
 
         if type(r) is not int:
             raise TypeError(f"Unsloth: Rank of {str(r)} must be an integer.")

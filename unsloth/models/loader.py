@@ -337,12 +337,35 @@ class FastLanguageModel(FastLlamaModel):
         if isinstance(dtype, str) and dtype in ["float16", "bfloat16"]:
             dtype = getattr(torch, dtype)
 
-        # M40 / Maxwell GPU: force FP32 and disable unsupported features
+        # M40 / Maxwell GPU: use pure HF+PEFT path (no Unsloth patching)
+        # Unsloth's forward patches use in-place ops that break autograd on sm_52
         if IS_MAXWELL_GPU:
             if dtype is None or dtype == torch.float16 or dtype == torch.bfloat16:
                 dtype = torch.float32
-                print("Unsloth [M40]: Forcing FP32 compute dtype (Maxwell GPU)")
-            fast_inference = False
+            print("Unsloth [M40]: Using pure HF+PEFT path (no in-place forward patching)")
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+            bnb_config = None
+            if load_in_4bit:
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True, bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype,
+                )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name, quantization_config=bnb_config,
+                device_map=device_map or "auto", torch_dtype=dtype,
+                attn_implementation="eager", token=token,
+                trust_remote_code=trust_remote_code,
+                revision=revision,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, token=token, trust_remote_code=trust_remote_code,
+            )
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+                tokenizer.pad_token_id = tokenizer.eos_token_id
+            model.max_seq_length = max_seq_length
+            return model, tokenizer
+            # fast_inference already False on M40
 
         assert (
             dtype is None
