@@ -2069,6 +2069,8 @@ def patch_tokenizer(model, tokenizer):
 
 
 def patch_fast_lora():
+    if IS_MAXWELL_GPU:
+        return  # M40: Skip fast_lora patching (in-place ops break autograd on sm_52)
     import peft.tuners.lora.bnb
 
     peft.tuners.lora.bnb.Linear4bit.forward = fast_lora_forward

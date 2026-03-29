@@ -1370,7 +1370,8 @@ class FastModel(FastBaseModel):
             use_gradient_checkpointing, max_seq_length, dtype
         )
         with redirector:
-            patch_loss_functions(torch_compile = False)
+            if not IS_MAXWELL_GPU:
+                patch_loss_functions(torch_compile = False)
             model_types, supports_sdpa = unsloth_compile_transformers(
                 dtype = dtype,
                 model_name = model_name,
