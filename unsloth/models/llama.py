@@ -2811,7 +2811,9 @@ class FastLlamaModel:
             )
             model = _peft_get(model, _config)
             if use_gradient_checkpointing:
-                model.gradient_checkpointing_enable()
+                model.gradient_checkpointing_enable(
+                    gradient_checkpointing_kwargs={"use_reentrant": False}
+                )
             print(f"Unsloth [M40]: Applied LoRA via pure PEFT (r={r}, alpha={lora_alpha})")
             return model
 
