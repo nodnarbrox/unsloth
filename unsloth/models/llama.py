@@ -3240,6 +3240,12 @@ class FastLlamaModel:
         model,
         use_gradient_checkpointing = "unsloth",
     ):
+        if IS_MAXWELL_GPU:
+            # M40: Skip LoRA forward patching (in-place ops break autograd on sm_52).
+            # Use standard PEFT forward functions instead.
+            if use_gradient_checkpointing:
+                model.gradient_checkpointing_enable()
+            return model
         if os.environ.get("UNSLOTH_USE_NEW_MODEL", "0") == "1":
             return FastBaseModel.patch_peft_model(
                 model = model,
