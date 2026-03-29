@@ -336,4 +336,7 @@ from unsloth_zoo.rl_environments import (
 )
 
 # Patch TRL trainers for backwards compatibility
-_patch_trl_trainer()
+if not IS_MAXWELL_GPU:
+    _patch_trl_trainer()
+else:
+    pass  # M40: Skip TRL trainer patching to avoid bf16 enforcement
