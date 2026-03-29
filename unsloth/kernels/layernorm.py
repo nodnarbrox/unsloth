@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import triton
-import triton.language as tl
+from ..device_type import IS_MAXWELL_GPU
+from ._triton_shim import triton, tl
 import torch
-from .utils import calculate_settings, torch_gpu_device
 from unsloth_zoo.patching_utils import (
     patch_layernorm,
 )
+
+from .utils import calculate_settings, torch_gpu_device
 
 
 @triton.jit
@@ -225,3 +226,8 @@ def testing_suite_layernorm():
                             random_state = random_state,
                             seqlen = seqlen,
                         )
+
+
+# M40 Maxwell GPU fallback: override with pure PyTorch implementations
+if IS_MAXWELL_GPU:
+    from ._m40_fallbacks import Fast_Layernorm_M40 as Fast_Layernorm

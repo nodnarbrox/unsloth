@@ -56,6 +56,7 @@ from ..device_type import (
     DEVICE_TYPE_TORCH,
     DEVICE_COUNT,
     ALLOW_PREQUANTIZED_MODELS,
+    IS_MAXWELL_GPU,
 )
 
 transformers_version = Version(transformers_version)
@@ -2344,6 +2345,9 @@ class FastLlamaModel:
         preferred_attn_impl = (
             prefer_flex_attn_if_supported(model_function, model_config) or "eager"
         )
+        # M40 / Maxwell: no Flash Attention or SDPA, force eager
+        if IS_MAXWELL_GPU:
+            preferred_attn_impl = "eager"
 
         has_rope_scaling = False
         try:

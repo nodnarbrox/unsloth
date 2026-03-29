@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import triton
-import triton.language as tl
+from ..device_type import IS_MAXWELL_GPU
+from ._triton_shim import triton, tl
 import torch
-from .utils import (
-    calculate_settings,
-    triton_tanh,
-    torch_gpu_device,
-)
+
+from .utils import calculate_settings, torch_gpu_device
+if not IS_MAXWELL_GPU:
+    from .utils import triton_tanh
 
 # signed int32 max is 2**31-1 so num_elements cannot exceed 2**31
 NUM_INT32_ELEMENTS = 2**31
@@ -288,3 +287,13 @@ def geglu_approx_backward_kernel(DW, e, g):
             LONG_INDEXING = 0 if n_elements <= INT32_SAFETY_BUFFER else 1,
         )
     return DW, e, g
+
+
+# M40 Maxwell GPU fallback: override with pure PyTorch implementations
+if IS_MAXWELL_GPU:
+    from ._m40_fallbacks import (
+        geglu_exact_forward_kernel,
+        geglu_exact_backward_kernel,
+        geglu_approx_forward_kernel,
+        geglu_approx_backward_kernel,
+    )

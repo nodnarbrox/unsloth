@@ -16,6 +16,7 @@ import torch
 from functools import lru_cache
 from transformers.models.llama.modeling_llama import logger
 import os
+from ..device_type import IS_MAXWELL_GPU
 
 torch_compile_options = {
     "epilogue_fusion": True,
@@ -32,9 +33,10 @@ try:
         create_block_mask as _create_block_mask,
     )
 
-    _flex_attention = torch.compile(
-        _flex_attention, dynamic = True, options = torch_compile_options
-    )
+    if not IS_MAXWELL_GPU:
+        _flex_attention = torch.compile(
+            _flex_attention, dynamic = True, options = torch_compile_options
+        )
     HAS_FLEX_ATTENTION = False
 except:
     HAS_FLEX_ATTENTION = False
@@ -42,7 +44,11 @@ except:
 
 if not HAS_FLEX_ATTENTION:
     # Logit softcapping
-    @torch.compile(fullgraph = True, dynamic = True, options = torch_compile_options)
+    _compile_decorator = (
+        (lambda fn: fn) if IS_MAXWELL_GPU else
+        torch.compile(fullgraph = True, dynamic = True, options = torch_compile_options)
+    )
+    @_compile_decorator
     def slow_attention_softcapping(Q, K, V, causal_mask, self, bsz, q_len):
         n_heads = self.config.num_attention_heads
         head_dim = self.head_dim

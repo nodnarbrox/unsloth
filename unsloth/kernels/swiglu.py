@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import triton
-import triton.language as tl
+from ..device_type import IS_MAXWELL_GPU
+from ._triton_shim import triton, tl
 import torch
+
 from .utils import calculate_settings, torch_gpu_device
 
 # signed int32 max is 2**31-1 so num_elements cannot exceed 2**31
@@ -141,3 +142,11 @@ def swiglu_DWf_DW_dfg_kernel(DW, e, g):
             LONG_INDEXING = 0 if n_elements <= INT32_SAFETY_BUFFER else 1,
         )
     return DW, e, g
+
+
+# M40 Maxwell GPU fallback: override with pure PyTorch implementations
+if IS_MAXWELL_GPU:
+    from ._m40_fallbacks import (
+        swiglu_fg_kernel,
+        swiglu_DWf_DW_dfg_kernel,
+    )

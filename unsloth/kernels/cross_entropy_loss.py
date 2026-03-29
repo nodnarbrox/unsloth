@@ -12,24 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import triton
-import triton.language as tl
+from ..device_type import IS_MAXWELL_GPU
+from ._triton_shim import triton, tl
 import torch
-from .utils import (
-    calculate_settings,
-    MAX_FUSED_SIZE,
-    triton_tanh,
-    triton_cast,
-    torch_gpu_device,
-    is_cdna,
-)
-from transformers.models.llama.modeling_llama import logger
 from unsloth_zoo.utils import Version
-
 from unsloth_zoo.loss_utils import (
     patch_loss_functions as _patch_loss_functions,
     post_patch_loss_function,
 )
+
+from .utils import calculate_settings, MAX_FUSED_SIZE, torch_gpu_device
+if not IS_MAXWELL_GPU:
+    from .utils import triton_tanh, triton_cast, is_cdna
+    from transformers.models.llama.modeling_llama import logger
 
 
 def _cross_entropy_forward(
@@ -461,3 +456,14 @@ if (Version(torch.__version__) < Version("2.4.0")) and not hasattr(
 # Patch CE Losses in transformers
 def patch_loss_functions(torch_compile = True):
     _patch_loss_functions(fast_cross_entropy_loss, torch_compile = torch_compile)
+
+
+# M40 Maxwell GPU fallback: override with pure PyTorch implementations
+if IS_MAXWELL_GPU:
+    from ._m40_fallbacks import (
+        fast_cross_entropy_loss,
+        Fast_CrossEntropyLoss_M40 as Fast_CrossEntropyLoss,
+    )
+
+    def patch_loss_functions(torch_compile = True):
+        _patch_loss_functions(fast_cross_entropy_loss, torch_compile = False)

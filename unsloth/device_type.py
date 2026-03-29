@@ -20,6 +20,7 @@ __all__ = [
     "DEVICE_COUNT",
     "ALLOW_PREQUANTIZED_MODELS",
     "ALLOW_BITSANDBYTES",
+    "IS_MAXWELL_GPU",
 ]
 
 import torch
@@ -77,6 +78,13 @@ def get_device_count():
 
 
 DEVICE_COUNT: int = get_device_count()
+
+# M40 / Maxwell compatibility mode: compute capability < 7.0
+# Triton requires sm_70+, Flash Attention requires sm_80+
+IS_MAXWELL_GPU: bool = False
+if DEVICE_TYPE == "cuda":
+    _m40_major, _m40_minor = torch.cuda.get_device_capability()
+    IS_MAXWELL_GPU = (_m40_major < 7)
 
 # 4-bit quantization requires a block size of 64
 # | Device Type     | Warp Size | Block Size |

@@ -59,6 +59,7 @@ from ..device_type import (
     DEVICE_COUNT,
     ALLOW_PREQUANTIZED_MODELS,
     ALLOW_BITSANDBYTES,
+    IS_MAXWELL_GPU,
 )
 
 # https://github.com/huggingface/transformers/pull/26037 allows 4 bit loading!
@@ -335,6 +336,14 @@ class FastLanguageModel(FastLlamaModel):
 
         if isinstance(dtype, str) and dtype in ["float16", "bfloat16"]:
             dtype = getattr(torch, dtype)
+
+        # M40 / Maxwell GPU: force FP32 and disable unsupported features
+        if IS_MAXWELL_GPU:
+            if dtype is None or dtype == torch.float16 or dtype == torch.bfloat16:
+                dtype = torch.float32
+                print("Unsloth [M40]: Forcing FP32 compute dtype (Maxwell GPU)")
+            fast_inference = False
+
         assert (
             dtype is None
             or dtype == torch.float16
@@ -914,6 +923,14 @@ class FastModel(FastBaseModel):
                 "Device does not support bfloat16. Will change to float16."
             )
             dtype = torch.float16
+
+        # M40 / Maxwell GPU: force FP32 and disable unsupported features
+        if IS_MAXWELL_GPU:
+            if dtype == torch.float16 or dtype == torch.bfloat16:
+                dtype = torch.float32
+                print("Unsloth [M40]: Forcing FP32 compute dtype (Maxwell GPU)")
+            fast_inference = False
+
         assert dtype in (torch.float16, torch.bfloat16, torch.float32)
         assert load_in_fp8 in (True, False, "block")
 

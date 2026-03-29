@@ -13,10 +13,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import triton
-import triton.language as tl
+from ..device_type import IS_MAXWELL_GPU, DEVICE_COUNT
+from ._triton_shim import triton, tl
 import torch
-from ..device_type import DEVICE_COUNT
+
 from .utils import calculate_settings, torch_gpu_device, torch_device_stream
 
 
@@ -463,3 +463,11 @@ def inplace_rope_embedding(Q, K, cos, sin, position_ids):
     K = Slow_RoPE_Embedding.apply(K, cos, sin, position_ids)
     torch_device_stream(Q.device).synchronize()
     return Q, K
+
+
+# M40 Maxwell GPU fallback: override with pure PyTorch implementations
+if IS_MAXWELL_GPU:
+    from ._m40_fallbacks import (
+        Fast_RoPE_Embedding_M40 as Fast_RoPE_Embedding,
+        Fast_RoPE_Embedding_QK_M40 as Fast_RoPE_Embedding_QK,
+    )

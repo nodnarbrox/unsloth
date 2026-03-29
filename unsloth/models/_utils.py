@@ -103,6 +103,7 @@ from ..device_type import (
     DEVICE_TYPE_TORCH,
     DEVICE_COUNT,
     ALLOW_PREQUANTIZED_MODELS,
+    IS_MAXWELL_GPU,
 )
 from ..import_fixes import UNSLOTH_ENABLE_LOGGING
 from unsloth_zoo.log import logger
@@ -969,6 +970,12 @@ elif DEVICE_TYPE == "hip":
 elif DEVICE_TYPE == "xpu":
     SUPPORTS_BFLOAT16 = True
 
+# M40 / Maxwell GPU override: no BF16, no Flash Attention
+if IS_MAXWELL_GPU:
+    SUPPORTS_BFLOAT16 = False
+    HAS_FLASH_ATTENTION = False
+    HAS_FLASH_ATTENTION_SOFTCAPPING = False
+
 # =============================================
 # Get Xformers
 # Silence xformers CUDA mismatch warnings before import
@@ -979,6 +986,8 @@ try:
 except:
     pass
 try:
+    if IS_MAXWELL_GPU:
+        raise ModuleNotFoundError("xformers not supported on Maxwell GPUs (sm_52)")
     from xformers import __version__ as xformers_version
 
     # Xformers <= 0.0.32.post2 has a broken FA3 dispatch on Blackwell/RTX 50x GPUs.

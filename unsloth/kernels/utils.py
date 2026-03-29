@@ -13,11 +13,7 @@
 # limitations under the License.
 
 import importlib
-import triton
 import ctypes
-
-MAX_FUSED_SIZE: int = 65536
-next_power_of_2 = triton.next_power_of_2
 import functools
 from typing import Optional
 
@@ -28,7 +24,19 @@ from ..device_type import (
     DEVICE_TYPE_TORCH,
     DEVICE_COUNT,
     ALLOW_PREQUANTIZED_MODELS,
+    IS_MAXWELL_GPU,
 )
+
+if not IS_MAXWELL_GPU:
+    import triton
+    MAX_FUSED_SIZE: int = 65536
+    next_power_of_2 = triton.next_power_of_2
+else:
+    import math as _math
+    MAX_FUSED_SIZE: int = 65536
+    def next_power_of_2(n):
+        if n <= 0: return 1
+        return 1 << (_math.ceil(_math.log2(max(n, 1))))
 from .fp8 import weight_dequant, fp8_linear
 import functools
 
@@ -56,45 +64,52 @@ if DEVICE_TYPE == "xpu":
 
 
 # tl.math.tanh now is libdevice.tanh
-import triton
-import triton.language as tl
+if not IS_MAXWELL_GPU:
+    import triton
+    import triton.language as tl
 
-if Version(triton.__version__) >= Version("3.0.0"):
-    if DEVICE_TYPE == "xpu":
-        triton_tanh = tl.extra.intel.libdevice.tanh
+    if Version(triton.__version__) >= Version("3.0.0"):
+        if DEVICE_TYPE == "xpu":
+            triton_tanh = tl.extra.intel.libdevice.tanh
+        else:
+            from triton.language.extra import libdevice
+
+            triton_tanh = libdevice.tanh
+        triton_cast = tl.cast
     else:
-        from triton.language.extra import libdevice
+        triton_tanh = tl.math.tanh
 
-        triton_tanh = libdevice.tanh
-    triton_cast = tl.cast
+        # No casting in old Triton versions
+        @triton.jit
+        def triton_cast(x, dtype):
+            return x.to(dtype)
+
+
+    @functools.lru_cache(1)
+    def is_cdna():
+        return is_hip() and triton.runtime.driver.active.get_current_target().arch in (
+            "gfx940",
+            "gfx941",
+            "gfx942",
+            "gfx950",  # CDNA4 (MI350/MI355X)
+        )
+
+
+    @functools.lru_cache(1)
+    def is_rdna():
+        """Detect ROCm-supported RDNA consumer/workstation GPUs (RDNA3, RDNA4)."""
+        return is_hip() and triton.runtime.driver.active.get_current_target().arch in (
+            "gfx1100",
+            "gfx1101",
+            "gfx1200",
+            "gfx1201",
+        )
 else:
-    triton_tanh = tl.math.tanh
-
-    # No casting in old Triton versions
-    @triton.jit
-    def triton_cast(x, dtype):
-        return x.to(dtype)
-
-
-@functools.lru_cache(1)
-def is_cdna():
-    return is_hip() and triton.runtime.driver.active.get_current_target().arch in (
-        "gfx940",
-        "gfx941",
-        "gfx942",
-        "gfx950",  # CDNA4 (MI350/MI355X)
-    )
-
-
-@functools.lru_cache(1)
-def is_rdna():
-    """Detect ROCm-supported RDNA consumer/workstation GPUs (RDNA3, RDNA4)."""
-    return is_hip() and triton.runtime.driver.active.get_current_target().arch in (
-        "gfx1100",
-        "gfx1101",
-        "gfx1200",
-        "gfx1201",
-    )
+    # M40 / Maxwell compatibility: no Triton support (needs sm_70+)
+    triton_tanh = None
+    triton_cast = None
+    def is_cdna(): return False
+    def is_rdna(): return False
 
 
 def calculate_settings(
